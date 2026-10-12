@@ -25,20 +25,30 @@ class RecognitionTests(unittest.TestCase):
         }
         for phrase, expected in examples.items():
             with self.subTest(phrase=phrase):
-                self.assertEqual(cyk(grammar, phrase.split()), expected)
+                result = cyk(grammar, phrase.split())
+                self.assertEqual(result.accepted, expected)
+                self.assertGreaterEqual(result.elapsed_seconds, 0)
+                if expected:
+                    self.assertEqual(result.tree.leaves(), tuple(phrase.split()))
+                else:
+                    self.assertIsNone(result.tree)
 
     def test_empty_languages_and_nonstandard_start(self):
         for source, empty, single in (("%start Root", False, False),
                                       ("Root -> e", True, False),
                                       ("Root -> e | id", True, True)):
             grammar = parse_grammar(source)
-            self.assertEqual(cyk(grammar, []), empty)
-            self.assertEqual(cyk(grammar, ["id"]), single)
+            self.assertEqual(cyk(grammar, []).accepted, empty)
+            self.assertEqual(cyk(grammar, ["id"]).accepted, single)
+            if empty:
+                tree = cyk(grammar, []).tree
+                self.assertEqual(tree.leaves(), ())
+                self.assertEqual(tree.to_text(), "Root\n  ε")
 
     def test_conversion_and_multi_character_tokens(self):
         grammar = convert_to_cnf(read_grammar(ROOT / "data/1.txt")).grammar
-        self.assertTrue(cyk(grammar, ["(", "id", ")", "+", "id"]))
-        self.assertFalse(cyk(grammar, ["id", "+"]))
+        self.assertTrue(cyk(grammar, ["(", "id", ")", "+", "id"]).accepted)
+        self.assertFalse(cyk(grammar, ["id", "+"]).accepted)
 
     def test_invalid_cnf_and_token_input(self):
         with self.assertRaises(ValueError):

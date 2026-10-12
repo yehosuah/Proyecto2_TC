@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import perf_counter
 from typing import Iterable
 
 from .cnf import validate_cnf
@@ -13,6 +14,69 @@ from .grammar import Grammar, Production
 class _Backpointer:
     production: Production
     split: int | None = None
+
+
+@dataclass(frozen=True)
+class ParseTree:
+    """Nodo de una regla CNF; los terminales se guardan como cadenas hijas."""
+    production: Production
+    children: tuple[ParseTree | str, ...] = ()
+
+    def leaves(self) -> tuple[str, ...]:
+        result = []
+        pending: list[ParseTree | str] = [self]
+        while pending:
+            node = pending.pop()
+            if isinstance(node, str):
+                result.append(node)
+            else:
+                pending.extend(reversed(node.children))
+        return tuple(result)
+
+    def to_text(self) -> str:
+        """Árbol indentado, incluida una hoja ε para la producción vacía."""
+        lines = []
+        pending: list[tuple[ParseTree | str, int]] = [(self, 0)]
+        while pending:
+            node, depth = pending.pop()
+            if isinstance(node, str):
+                lines.append("  " * depth + node)
+            else:
+                lines.append("  " * depth + node.production.lhs)
+                if not node.production.rhs:
+                    lines.append("  " * (depth + 1) + "ε")
+                pending.extend((child, depth + 1) for child in reversed(node.children))
+        return "\n".join(lines)
+
+
+@dataclass(frozen=True)
+class CYKResult:
+    accepted: bool
+    tokens: tuple[str, ...]
+    elapsed_seconds: float
+    tree: ParseTree | None
+
+
+def _build_tree(chart, start: str, size: int) -> ParseTree:
+    # Postorden iterativo: evita depender del límite de recursión de Python.
+    root = (0, size, start)
+    pending = [(root, False)]
+    built: dict[tuple[int, int, str], ParseTree] = {}
+    while pending:
+        key, ready = pending.pop()
+        i, j, symbol = key
+        pointer = chart[i, j][symbol]
+        rule, split = pointer.production, pointer.split
+        if split is None:
+            built[key] = ParseTree(rule, rule.rhs)
+            continue
+        left = (i, split, rule.rhs[0])
+        right = (split, j, rule.rhs[1])
+        if ready:
+            built[key] = ParseTree(rule, (built[left], built[right]))
+        else:
+            pending.extend(((key, True), (right, False), (left, False)))
+    return built[root]
 
 
 def _recognize(grammar: Grammar, tokens: tuple[str, ...]):
@@ -46,8 +110,12 @@ def _recognize(grammar: Grammar, tokens: tuple[str, ...]):
     return chart
 
 
-def cyk(grammar: Grammar, tokens: Iterable[str]) -> bool:
-    """Reconoce tokens completos en CNF estricta; no normaliza sus símbolos."""
+def cyk(grammar: Grammar, tokens: Iterable[str]) -> CYKResult:
+    """Reconoce tokens exactos y devuelve un árbol de la CNF si son aceptados.
+
+    Cronometra índices, tabla y decisión; excluye validación de CNF, preparación
+    de tokens y reconstrucción del árbol. No convierte ni normaliza la entrada.
+    """
     errors = validate_cnf(grammar)
     if errors:
         raise ValueError("CYK requiere una gramática en CNF: " + "; ".join(errors))
@@ -57,5 +125,9 @@ def cyk(grammar: Grammar, tokens: Iterable[str]) -> bool:
     if any(not isinstance(token, str) or not token or any(c.isspace() for c in token)
            for token in word):
         raise ValueError("Cada token debe ser un símbolo completo sin espacios.")
+    started = perf_counter()
     chart = _recognize(grammar, word)
-    return grammar.start in chart[0, len(word)]
+    accepted = grammar.start in chart[0, len(word)]
+    elapsed = perf_counter() - started
+    tree = _build_tree(chart, grammar.start, len(word)) if accepted else None
+    return CYKResult(accepted, word, elapsed, tree)
