@@ -1,47 +1,102 @@
 # Proyecto 2: simplificación de CFG y algoritmo CYK
 
-Proyecto de Teoría de la Computación, desarrollado por etapas en Python.
-La primera mitad implementa la simplificación y conversión a forma normal de
-Chomsky. La segunda mitad, a cargo de Miguel Rosas, está pendiente.
+Programa en Python 3.9 o posterior, sin paquetes externos. Lee una gramática,
+la simplifica, la convierte a Chomsky y reconoce una frase con programación
+dinámica. Muestra SÍ/NO, tiempo y un árbol si la acepta.
 
 | Parte | Responsable | Estado |
 | --- | --- | --- |
-| Modelo, lector, simplificación y Chomsky | Yehosua | Implementación asistida por Codex; 20 pruebas pasan; revisión personal pendiente |
-| CYK, árbol sintáctico y tiempo de reconocimiento | Miguel Rosas | Pendiente |
-| Integración, ejemplos de frases y reporte final | Ambos | Pendiente |
+| Modelo, lector, simplificación y Chomsky | Yehosua | Implementado con asistencia de Codex |
+| CYK, árbol y tiempo | Miguel Rosas | Implementado con asistencia de Codex |
+| Integración y documentación | Ambos | Programa y reporte completos; revisión humana conjunta pendiente |
 
-El programa actual convierte gramáticas. Todavía no reconoce frases ni genera
-árboles sintácticos. Esa es la entrega que desarrollará Miguel.
+## Ejecutar
 
-## Ejecutar la primera mitad
+En Windows usar `py -3`; en Linux/macOS, `python3` en los mismos comandos.
+Desde la raíz del repositorio:
 
-Requiere Python 3.9 o posterior, sin paquetes externos. Desde la raíz del repo:
-
-```bash
-python3 main.py data/1.txt
-python3 main.py data/1.txt --output output/aritmetica-cnf.txt --trace-dir output/etapas-aritmetica
-python3 main.py data/ingles.txt --output output/ingles-cnf.txt
-python3 -m unittest discover -s tests -v
+```powershell
+py -3 main.py data/ingles.txt --sentence "She eats a cake with a fork"
+py -3 main.py data/ingles.txt --sentence "she eats cake"
+py -3 main.py data/ingles.txt --sentence ""
+"He cooks" | py -3 main.py data/ingles.txt --stdin
+py -3 main.py data/1.txt --sentence "( id ) + id"
+py -3 -m unittest discover -s tests -v
+py -3 benchmark.py --repeat 100
 ```
 
-`--trace-dir` guarda el original y las seis transformaciones en archivos separados.
-`--start E` permite elegir el símbolo inicial. Los errores de entrada terminan
-con código 2 y un mensaje en stderr. `output/` es regenerable y no se versiona.
-
-## Estructura
+Ejemplo de salida para `she eats`:
 
 ```text
-cfg/grammar.py          Modelo, lectura y escritura de gramáticas
-cfg/cnf.py              Simplificación, conversión y validación de CNF
-main.py                 Interfaz de conversión por consola
-data/1.txt              Gramática aritmética proporcionada
-data/1-cnf.txt          Resultado de referencia proporcionado
-data/ingles.txt         Gramática inglesa del enunciado
-tests/test_conversion.py
-docs/primera-mitad.md   Diseño, explicación, discusión y validación
-docs/entrega-miguel.md  Contrato de integración y trabajo pendiente
-docs/colaboracion.md    Etapas y registro de contribuciones
+SÍ
+Tiempo de reconocimiento: 0.000017450 s
+Árbol sintáctico (CNF):
+S
+  NP
+    she
+  VP
+    eats
 ```
+
+La duración varía. El cronómetro incluye índices, tabla CYK y decisión;
+excluye lectura, conversión, normalización, validación de CNF, reconstrucción
+e impresión del árbol.
+
+Se normaliza a minúsculas y se separa por espacios en blanco, incluidos tabuladores
+y saltos de línea. `--case-sensitive` conserva mayúsculas. La puntuación se
+conserva: `she eats.` se rechaza. Para aritmética separar también paréntesis
+y operadores. `--stdin` consume toda la entrada como una frase y no puede
+combinarse con `--sentence`. La entrada vacía se acepta solo si la CNF tiene
+una regla vacía del inicio. La validación es sintáctica: `the cake drinks a knife`
+se acepta aunque su significado sea extraño.
+
+SÍ y NO terminan con código 0; errores de archivo/gramática/opciones con código 2.
+Un rechazo no imprime árbol.
+
+## Conversión y exportación
+
+Sin opciones de frase se conserva el comando original:
+
+```powershell
+py -3 main.py data/1.txt
+py -3 main.py data/1.txt --output output/aritmetica-cnf.txt --trace-dir output/etapas-aritmetica
+py -3 main.py data/ingles.txt --sentence "he cooks" --output output/ingles-cnf.txt
+```
+
+`--trace-dir` guarda siete instantáneas: original y seis transformaciones.
+`--start E` permite elegir el inicio. Los destinos no pueden coincidir con la
+entrada ni entre salida y etapas. `output/` es regenerable y no se versiona.
+
+## API y estructura
+
+```python
+from cfg import read_grammar, convert_to_cnf, cyk
+
+conversion = convert_to_cnf(read_grammar("data/ingles.txt"))
+result = cyk(conversion.grammar, "she eats".split())
+print(result.accepted, result.elapsed_seconds)
+if result.tree is not None:
+    print(result.tree.to_text())
+    assert result.tree.leaves() == result.tokens
+```
+
+La API recibe tokens exactos, sin normalizarlos, y exige CNF estricta.
+El árbol pertenece a la gramática convertida; en inglés coincide con la original.
+
+| Archivo | Función |
+| --- | --- |
+| `cfg/grammar.py` | Modelo, lectura y serialización |
+| `cfg/cnf.py` | Simplificación y conversión a Chomsky |
+| `cfg/cyk.py` | Tabla dinámica, resultado, árbol y cronómetro |
+| `main.py` | Consola de conversión y reconocimiento |
+| `benchmark.py` | Medianas reproducibles para nueve ejemplos |
+| `tests/test_conversion.py` | 20 pruebas originales y oráculo independiente |
+| `tests/test_cyk.py` | 9 pruebas de reconocimiento y árboles |
+| `tests/test_cli_cyk.py` | 5 pruebas de integración de consola |
+| `docs/reporte-final.md` | Diseño integrado, discusión, pruebas y tiempos |
+| `docs/primera-mitad.md` | Detalle de transformaciones |
+| `docs/entrega-miguel.md` | Contrato actualizado |
+| `docs/colaboracion.md` | Contribuciones y revisiones pendientes |
 
 ## Formato de gramática
 
@@ -51,33 +106,15 @@ NP -> she | he
 VP -> eats
 ```
 
-- Separar los símbolos con espacios; `NP` e `id` son símbolos completos.
-- Separar alternativas con `|` y usar `->` para cada producción.
-- `e` o `ε`, solos, representan la cadena vacía; están reservados.
-- Los lados izquierdos definen no terminales. Los demás símbolos son terminales,
-  independientemente de si están escritos en mayúsculas.
-- El primer lado izquierdo es el inicio, salvo cabecera `%start S` o `--start`.
-- `%nonterminals A B` permite declarar no terminales sin reglas. Las etapas
-  intermedias pueden necesitar esa cabecera para conservar su clasificación.
-- Se admiten líneas vacías y comentarios de línea completa con `#`.
-- No se admiten terminales con espacios ni los delimitadores reservados como símbolos.
+Separar símbolos con espacios y alternativas con `|`. `NP` e `id` son tokens
+completos. `e` o `ε`, solos, representan vacío y están reservados. Los lados
+izquierdos, el inicio y `%nonterminals` definen no terminales; los demás símbolos
+son terminales, independientemente de sus mayúsculas. El primer lado izquierdo
+es el inicio, salvo `%start S` o `--start`. Se admiten líneas vacías y comentarios
+completos con `#`. Los símbolos no admiten espacios ni delimitadores reservados.
+`%nonterminals A B` conserva símbolos sin reglas.
 
-La salida usa `%start` para conservar el inicio incluso si no quedan reglas.
-Una gramática sin reglas genera el lenguaje vacío; una regla `S -> e` genera
-la cadena vacía. Son casos distintos.
-
-## Criterios del proyecto
-
-El enunciado asigna 7 puntos a simplificación, 7 a CYK y 1 a documentación.
-Exige respuesta SÍ/NO, tiempo de validación, árbol sintáctico y documentación
-de diseño, discusión y pruebas. La documentación es obligatoria para tener nota.
-
-La gramática inglesa ya satisface la forma de Chomsky, pero eso no reemplaza
-la implementación del conversor. Los archivos aritméticos permiten ejercitarla.
-El conversor usa la variante estricta que impide el inicio a la derecha; por eso
-puede introducir un nuevo inicio y nombres auxiliares diferentes del ejemplo.
-
-La documentación actual corresponde a la primera mitad. El reporte completo
-se cerrará cuando Miguel termine su módulo y ambos revisen la integración.
-
-Para continuar, leer [la entrega a Miguel](docs/entrega-miguel.md).
+Una gramática `%start S` sin reglas genera ∅; `S -> e` genera {ε}.
+El enunciado asigna 7 puntos a simplificación, 7 a CYK y 1 a documentación;
+la documentación es obligatoria. Las pruebas locales y sus límites están en
+el [reporte final](docs/reporte-final.md).

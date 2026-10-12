@@ -108,13 +108,13 @@ esa evidencia.
   recursos para gramáticas muy grandes.
 - **Formato de entrada:** los símbolos se separan por espacios; `e` y `ε` están
   reservados. No se implementa un analizador léxico para expresiones sin espacios.
-- **Árbol futuro:** CYK construirá el árbol de la gramática convertida. Reconstruir
+- **Árbol de CYK:** CYK construye el árbol de la gramática convertida. Reconstruir
   el árbol de la gramática original requeriría registrar correspondencias adicionales;
   no es necesario para la gramática inglesa entregada, que permanece igual.
 
-## Pendiente para el reporte final
+## Integración con el reporte final
 
-Miguel debe incorporar diseño y complejidad de CYK, estructura del árbol,
-medición del tiempo y resultados de frases aceptadas y rechazadas. Ambos deben
-revisar el texto, agregar sus observaciones reales y comprobar el programa completo.
-No se han medido tiempos de CYK porque ese módulo todavía no existe.
+El [reporte final](reporte-final.md) incorpora diseño y complejidad de CYK,
+estructura del árbol, intervalo del cronómetro y tiempos realmente medidos.
+La suite integrada tiene 34 pruebas aprobadas localmente con Python 3.12.2.
+La revisión humana de ambas partes sigue pendiente.
