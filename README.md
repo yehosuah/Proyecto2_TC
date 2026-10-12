@@ -1,5 +1,7 @@
 # Proyecto 2: simplificación de CFG y algoritmo CYK
 
+[Ver video de presentación](https://youtu.be/o0sZ9axf5T0?si=T53W78BlWkgml0Ma)
+
 Programa en Python 3.9 o posterior, sin paquetes externos. Lee una gramática,
 la simplifica, la convierte a Chomsky y reconoce una frase con programación
 dinámica. Muestra SÍ/NO, tiempo y un árbol si la acepta.
