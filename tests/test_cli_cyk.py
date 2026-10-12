@@ -1,6 +1,7 @@
 """Integración de conversión, normalización y reconocimiento por consola."""
 
 from pathlib import Path
+import os
 import subprocess
 import sys
 import tempfile
@@ -16,7 +17,7 @@ class RecognitionCliTests(unittest.TestCase):
         return subprocess.run(
             [sys.executable, str(ROOT / "main.py"), *map(str, args)],
             input=input, capture_output=True, encoding="utf-8", cwd=ROOT,
-            env={**__import__("os").environ, "PYTHONIOENCODING": "utf-8"},
+            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
         )
 
     def test_normalization_and_tree(self):
